@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Django
+*.log
+*.pot
+*.pyc
+*.pyo
+*.db
+*.sqlite3
+
+# VSCode
+.vscode/
+
+# Virtualenv
+venv/
+venv_clean/
+ENV/
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Test/coverage
+htmlcov/
+.coverage
+.tox/
+.nox/
+.cache/
+
+# Migrations
+**/migrations/*.pyc
+**/migrations/__pycache__/
+
+# Node
+node_modules/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Backup
+*~
+*.bak
+
+# Custom
+*.swp
+*.swo
