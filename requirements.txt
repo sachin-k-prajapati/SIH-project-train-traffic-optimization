@@ -1,0 +1,6 @@
+Django
+djangorestframework
+ortools
+simpy
+numpy
+stable-baselines3
