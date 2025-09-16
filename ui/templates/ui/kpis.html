@@ -1,0 +1,125 @@
+{% extends 'ui/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Section Performance KPIs</h2>
+    <div>
+        <select id="section-selector" class="form-select me-2" style="width: 300px;">
+            {% for sec in sections %}
+            <option value="{{ sec.id }}" {% if sec.id == section.id %}selected{% endif %}>
+                {{ sec.name }}
+            </option>
+            {% endfor %}
+        </select>
+        <select id="hours-selector" class="form-select" style="width: 120px;">
+            <option value="1" {% if hours == 1 %}selected{% endif %}>1 hour</option>
+            <option value="6" {% if hours == 6 %}selected{% endif %}>6 hours</option>
+            <option value="24" {% if hours == 24 %}selected{% endif %}>24 hours</option>
+            <option value="72" {% if hours == 72 %}selected{% endif %}>3 days</option>
+        </select>
+    </div>
+</div>
+
+{% if section %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="display-4 text-primary">{{ kpis.last.throughput_trains|default:0 }}</div>
+                <div class="text-muted">Throughput (trains/hour)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="display-4 {% if kpis.last.avg_delay_minutes > 15 %}text-danger{% else %}text-success{% endif %}">
+                    {{ kpis.last.avg_delay_minutes|default:0|floatformat:1 }}
+                </div>
+                <div class="text-muted">Avg Delay (minutes)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="display-4 {% if kpis.last.punctuality_percent < 80 %}text-warning{% else %}text-success{% endif %}">
+                    {{ kpis.last.punctuality_percent|default:0|floatformat:1 }}%
+                </div>
+                <div class="text-muted">Punctuality</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="display-4 text-info">{{ kpis.last.utilization_percent|default:0|floatformat:1 }}%</div>
+                <div class="text-muted">Utilization</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Historical KPI Data</div>
+    <div class="card-body">
+        {% if kpis %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Throughput</th>
+                        <th>Avg Delay</th>
+                        <th>Punctuality</th>
+                        <th>Utilization</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for kpi in kpis %}
+                    <tr>
+                        <td>{{ kpi.timestamp }}</td>
+                        <td>{{ kpi.throughput_trains }}</td>
+                        <td class="{% if kpi.avg_delay_minutes > 15 %}text-danger{% endif %}">
+                            {{ kpi.avg_delay_minutes|floatformat:1 }} min
+                        </td>
+                        <td class="{% if kpi.punctuality_percent < 80 %}text-warning{% endif %}">
+                            {{ kpi.punctuality_percent|floatformat:1 }}%
+                        </td>
+                        <td>{{ kpi.utilization_percent|floatformat:1 }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            No KPI data available for the selected period.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    Please select a section to view KPIs.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('section-selector').addEventListener('change', function() {
+    updateUrl();
+});
+
+document.getElementById('hours-selector').addEventListener('change', function() {
+    updateUrl();
+});
+
+function updateUrl() {
+    const sectionId = document.getElementById('section-selector').value;
+    const hours = document.getElementById('hours-selector').value;
+    window.location.href = `?section_id=${sectionId}&hours=${hours}`;
+}
+</script>
+{% endblock %}

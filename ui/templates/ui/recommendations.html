@@ -1,0 +1,75 @@
+{% extends 'ui/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Train Precedence Recommendations</h2>
+    <select id="section-selector" class="form-select" style="width: 300px;">
+        {% for sec in sections %}
+        <option value="{{ sec.id }}" {% if sec.id == section.id %}selected{% endif %}>
+            {{ sec.name }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+
+{% if section %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Active Recommendations for {{ section.name }}</h5>
+    </div>
+    <div class="card-body">
+        {% if recommendations %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Decision Type</th>
+                        <th>Trains Involved</th>
+                        <th>Recommended Action</th>
+                        <th>Reason</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rec in recommendations %}
+                    <tr>
+                        <td><span class="badge bg-info">{{ rec.type }}</span></td>
+                        <td>
+                            {% for train_id in rec.trains %}
+                            <span class="badge bg-secondary">{{ train_id }}</span>
+                            {% endfor %}
+                        </td>
+                        <td>{{ rec.action }}</td>
+                        <td>{{ rec.reason }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-success">Implement</button>
+                            <button class="btn btn-sm btn-warning">Override</button>
+                            <button class="btn btn-sm btn-info">Details</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <div class="text-muted mb-2">No active recommendations for this section</div>
+            <small>All trains are operating according to schedule with no conflicts detected.</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    Please select a section to view recommendations.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('section-selector').addEventListener('change', function() {
+    window.location.href = '?section_id=' + this.value;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Section Controller Decision Support System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .priority-1 { border-left: 5px solid #dc3545; background: rgba(220,53,69,0.1); }
+        .priority-2 { border-left: 5px solid #fd7e14; background: rgba(253,126,20,0.1); }
+        .priority-3 { border-left: 5px solid #ffc107; background: rgba(255,193,7,0.1); }
+        .priority-4 { border-left: 5px solid #20c997; background: rgba(32,201,151,0.1); }
+        .priority-5 { border-left: 5px solid #6c757d; background: rgba(108,117,125,0.1); }
+        
+        .decision-proceed { background: rgba(25,135,84,0.2); border: 2px solid #198754; }
+        .decision-halt { background: rgba(220,53,69,0.2); border: 2px solid #dc3545; }
+        .decision-reroute { background: rgba(253,126,20,0.2); border: 2px solid #fd7e14; }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-clear { background: #198754; }
+        .status-caution { background: #ffc107; }
+        .status-blocked { background: #dc3545; }
+        
+        .recommendation-card {
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .recommendation-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #495057;
+        }
+        
+        .section-status {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .override-btn {
+            background: #6f42c1;
+            border: none;
+            color: white;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+        
+        .override-btn:hover {
+            background: #5a359c;
+            transform: scale(1.05);
+        }
+        
+        .what-if-panel {
+            background: rgba(13,110,253,0.1);
+            border: 2px solid #0d6efd;
+            border-radius: 10px;
+            padding: 1rem;
+        }
+        
+        .simulation-result {
+            background: #fff;
+            border-radius: 6px;
+            padding: 0.8rem;
+            margin: 0.5rem 0;
+            border-left: 4px solid #0d6efd;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">
+                <i class="fas fa-traffic-light"></i> Section Controller - Decision Support System
+            </span>
+            <div class="navbar-text">
+                Section: <strong>Mumbai-Pune Corridor</strong> | 
+                Controller: <strong>{{ user.username|default:"S. Kumar" }}</strong> |
+                Time: <span id="currentTime"></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-3">
+        <!-- Section Status Overview -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="section-status">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <h6><i class="fas fa-road"></i> Track Status</h6>
+                            <span class="status-indicator status-clear"></span>Main Line: Clear<br>
+                            <span class="status-indicator status-caution"></span>Loop Line: Caution<br>
+                            <span class="status-indicator status-blocked"></span>Siding: Blocked (Maintenance)
+                        </div>
+                        <div class="col-md-3">
+                            <h6><i class="fas fa-cloud"></i> Weather Conditions</h6>
+                            <strong>Clear Sky</strong><br>
+                            Visibility: 10 km<br>
+                            Impact Factor: 1.0
+                        </div>
+                        <div class="col-md-3">
+                            <h6><i class="fas fa-signal"></i> Signal Status</h6>
+                            All signals operational<br>
+                            Auto control: Active<br>
+                            Last update: 2 min ago
+                        </div>
+                        <div class="col-md-3">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Active Alerts</h6>
+                            <span class="text-warning">Platform 3 maintenance scheduled 14:30</span><br>
+                            <span class="text-info">Express 12158 running 8 min late</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Left Panel: Train Status & Recommendations -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-train"></i> Active Trains & AI Recommendations</h5>
+                        <div>
+                            <button class="btn btn-primary btn-sm" onclick="refreshRecommendations()">
+                                <i class="fas fa-sync"></i> Refresh
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="optimizeAll()">
+                                <i class="fas fa-brain"></i> Re-optimize
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Train Recommendations -->
+                        <div id="trainRecommendations">
+                            <!-- Train 1: High Priority Express -->
+                            <div class="recommendation-card priority-1 decision-proceed p-3">
+                                <div class="row align-items-center">
+                                    <div class="col-md-3">
+                                        <h6 class="mb-1">🚄 12158 Rajdhani</h6>
+                                        <small class="text-muted">Express • Priority 1</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="badge bg-danger">8 min late</span><br>
+                                        <small>Platform 1 → Platform 1</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong class="text-success">✅ PROCEED</strong><br>
+                                        <small>High priority, clear track ahead. ETA: 13:45</small><br>
+                                        <small><strong>Confidence:</strong> 98%</small>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="override-btn btn-sm" onclick="openOverride('12158')">
+                                            Override
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Train 2: Local Train -->
+                            <div class="recommendation-card priority-3 decision-halt p-3">
+                                <div class="row align-items-center">
+                                    <div class="col-md-3">
+                                        <h6 class="mb-1">🚇 67432 Local</h6>
+                                        <small class="text-muted">Suburban • Priority 3</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="badge bg-success">On time</span><br>
+                                        <small>Platform 2 → Platform 2</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong class="text-danger">⏸️ HALT</strong><br>
+                                        <small>Hold for Rajdhani precedence. Wait: ~5 min</small><br>
+                                        <small><strong>Confidence:</strong> 92%</small>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="override-btn btn-sm" onclick="openOverride('67432')">
+                                            Override
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Train 3: Freight -->
+                            <div class="recommendation-card priority-4 decision-reroute p-3">
+                                <div class="row align-items-center">
+                                    <div class="col-md-3">
+                                        <h6 class="mb-1">🚛 54321 Freight</h6>
+                                        <small class="text-muted">Container • Priority 4</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="badge bg-warning">2 min early</span><br>
+                                        <small>Main Line → Loop Line</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong class="text-warning">🔄 REROUTE</strong><br>
+                                        <small>Use loop line to avoid conflicts. Alt: Platform 4</small><br>
+                                        <small><strong>Confidence:</strong> 89%</small>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="override-btn btn-sm" onclick="openOverride('54321')">
+                                            Override
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Train 4: Another Express -->
+                            <div class="recommendation-card priority-2 decision-proceed p-3">
+                                <div class="row align-items-center">
+                                    <div class="col-md-3">
+                                        <h6 class="mb-1">🚄 22221 Duronto</h6>
+                                        <small class="text-muted">Express • Priority 2</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="badge bg-success">3 min early</span><br>
+                                        <small>Platform 3 → Platform 3</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong class="text-success">✅ PROCEED</strong><br>
+                                        <small>After Rajdhani clears. ETA: 13:52</small><br>
+                                        <small><strong>Confidence:</strong> 95%</small>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="override-btn btn-sm" onclick="openOverride('22221')">
+                                            Override
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- What-If Simulation Panel -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5><i class="fas fa-flask"></i> What-If Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="what-if-panel">
+                            <h6>Scenario Simulation</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Simulate Change:</label>
+                                    <select class="form-select" id="simulationScenario">
+                                        <option value="delay">Express delayed by 15 minutes</option>
+                                        <option value="breakdown">Platform 1 breakdown</option>
+                                        <option value="weather">Weather degradation (visibility 2km)</option>
+                                        <option value="emergency">Emergency vehicle crossing</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">&nbsp;</label><br>
+                                    <button class="btn btn-primary" onclick="runSimulation()">
+                                        <i class="fas fa-play"></i> Run Simulation
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="simulationResults" class="mt-3" style="display: none;">
+                                <h6>Simulation Results:</h6>
+                                <div class="simulation-result">
+                                    <strong>Impact:</strong> Average delay increases by 8.5 minutes<br>
+                                    <strong>New Recommendations:</strong> Reroute 2 additional trains to loop line<br>
+                                    <strong>Throughput:</strong> Reduced from 12 to 9 trains/hour
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Performance Metrics & Controls -->
+            <div class="col-md-4">
+                <!-- Performance Metrics -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-line"></i> Section Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="metric-card">
+                            <div class="metric-value text-success" id="currentThroughput">12</div>
+                            <small>Trains/Hour Throughput</small>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-value text-warning" id="avgDelay">3.2</div>
+                            <small>Average Delay (minutes)</small>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-value text-primary" id="punctuality">89.5</div>
+                            <small>Punctuality %</small>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-value text-info" id="utilization">76</div>
+                            <small>Section Utilization %</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Insights -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="fas fa-lightbulb"></i> AI Insights</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="aiInsights">
+                            <div class="alert alert-info">
+                                <strong>💡 Optimization Opportunity:</strong><br>
+                                Switching Train 67432 to Platform 4 could improve throughput by 15%
+                            </div>
+                            
+                            <div class="alert alert-warning">
+                                <strong>⚠️ Predicted Bottleneck:</strong><br>
+                                Evening rush (17:00-19:00) may require loop line activation
+                            </div>
+                            
+                            <div class="alert alert-success">
+                                <strong>✅ Performance Note:</strong><br>
+                                Current schedule adherence is 8% above section average
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manual Override Panel -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-hand-paper"></i> Manual Override</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Select Train:</label>
+                            <select class="form-select" id="overrideTrain">
+                                <option value="12158">12158 Rajdhani Express</option>
+                                <option value="67432">67432 Suburban Local</option>
+                                <option value="54321">54321 Container Freight</option>
+                                <option value="22221">22221 Duronto Express</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Override Decision:</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="overrideDecision" id="proceedOverride" value="proceed">
+                                <label class="btn btn-outline-success" for="proceedOverride">Proceed</label>
+                                
+                                <input type="radio" class="btn-check" name="overrideDecision" id="haltOverride" value="halt">
+                                <label class="btn btn-outline-danger" for="haltOverride">Halt</label>
+                                
+                                <input type="radio" class="btn-check" name="overrideDecision" id="rerouteOverride" value="reroute">
+                                <label class="btn btn-outline-warning" for="rerouteOverride">Reroute</label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Reason:</label>
+                            <input type="text" class="form-control" id="overrideReason" placeholder="Enter override reason...">
+                        </div>
+                        
+                        <button class="btn btn-warning w-100" onclick="applyOverride()">
+                            <i class="fas fa-exclamation-triangle"></i> Apply Override
+                        </button>
+                        
+                        <small class="text-muted d-block mt-2">
+                            All overrides are logged for audit and analysis
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Override Modal -->
+    <div class="modal fade" id="overrideModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Override Recommendation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>You are about to override the AI recommendation for <strong id="overrideTrainId"></strong>.</p>
+                    <p>Current AI recommendation: <span id="currentRecommendation"></span></p>
+                    <p><strong>Please provide justification for this override:</strong></p>
+                    <textarea class="form-control" id="overrideJustification" rows="3" placeholder="Operational reason for override..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" onclick="confirmOverride()">Confirm Override</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Refresh recommendations
+        function refreshRecommendations() {
+            // Simulate API call
+            console.log('Refreshing AI recommendations...');
+            // In real implementation, this would call the optimization engine
+            alert('Recommendations refreshed based on current section state');
+        }
+
+        // Re-optimize all trains
+        function optimizeAll() {
+            console.log('Running full optimization...');
+            // Show loading state
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Optimizing...';
+            button.disabled = true;
+            
+            // Simulate optimization
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+                alert('Optimization complete. New recommendations generated.');
+            }, 2000);
+        }
+
+        // Open override modal
+        function openOverride(trainId) {
+            document.getElementById('overrideTrainId').textContent = trainId;
+            // Set current recommendation based on train
+            const recommendations = {
+                '12158': 'PROCEED',
+                '67432': 'HALT',
+                '54321': 'REROUTE',
+                '22221': 'PROCEED'
+            };
+            document.getElementById('currentRecommendation').textContent = recommendations[trainId];
+            
+            const modal = new bootstrap.Modal(document.getElementById('overrideModal'));
+            modal.show();
+        }
+
+        // Confirm override
+        function confirmOverride() {
+            const trainId = document.getElementById('overrideTrainId').textContent;
+            const justification = document.getElementById('overrideJustification').value;
+            
+            if (!justification.trim()) {
+                alert('Please provide justification for the override');
+                return;
+            }
+            
+            console.log(`Override applied for train ${trainId}: ${justification}`);
+            alert(`Override logged for train ${trainId}. System will adapt recommendations accordingly.`);
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('overrideModal'));
+            modal.hide();
+        }
+
+        // Apply manual override
+        function applyOverride() {
+            const trainId = document.getElementById('overrideTrain').value;
+            const decision = document.querySelector('input[name="overrideDecision"]:checked')?.value;
+            const reason = document.getElementById('overrideReason').value;
+            
+            if (!decision) {
+                alert('Please select an override decision');
+                return;
+            }
+            
+            if (!reason.trim()) {
+                alert('Please provide a reason for the override');
+                return;
+            }
+            
+            console.log(`Manual override: Train ${trainId} -> ${decision.toUpperCase()}, Reason: ${reason}`);
+            alert(`Manual override applied for train ${trainId}: ${decision.toUpperCase()}`);
+            
+            // Clear form
+            document.getElementById('overrideReason').value = '';
+            document.querySelector('input[name="overrideDecision"]:checked').checked = false;
+        }
+
+        // Run what-if simulation
+        function runSimulation() {
+            const scenario = document.getElementById('simulationScenario').value;
+            console.log(`Running simulation: ${scenario}`);
+            
+            // Show results
+            document.getElementById('simulationResults').style.display = 'block';
+            
+            // Simulate different results based on scenario
+            const results = {
+                delay: {
+                    impact: 'Average delay increases by 8.5 minutes',
+                    recommendations: 'Reroute 2 additional trains to loop line',
+                    throughput: 'Reduced from 12 to 9 trains/hour'
+                },
+                breakdown: {
+                    impact: 'Platform 1 unavailable, major disruption',
+                    recommendations: 'Redirect all Platform 1 trains to Platform 2 and 4',
+                    throughput: 'Reduced from 12 to 7 trains/hour'
+                },
+                weather: {
+                    impact: 'Speed restrictions in effect, 25% capacity reduction',
+                    recommendations: 'Extend headways, activate fog protocols',
+                    throughput: 'Reduced from 12 to 9 trains/hour'
+                },
+                emergency: {
+                    impact: 'Temporary halt for emergency vehicle crossing',
+                    recommendations: 'Hold all trains for 5 minutes, then resume',
+                    throughput: 'Temporary reduction, normal resume in 10 minutes'
+                }
+            };
+            
+            const result = results[scenario];
+            document.querySelector('.simulation-result').innerHTML = `
+                <strong>Impact:</strong> ${result.impact}<br>
+                <strong>New Recommendations:</strong> ${result.recommendations}<br>
+                <strong>Throughput:</strong> ${result.throughput}
+            `;
+        }
+
+        // Simulate real-time updates
+        setInterval(() => {
+            // Update metrics with small variations
+            const throughput = document.getElementById('currentThroughput');
+            const current = parseInt(throughput.textContent);
+            throughput.textContent = current + (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2);
+            
+            const delay = document.getElementById('avgDelay');
+            const currentDelay = parseFloat(delay.textContent);
+            delay.textContent = Math.max(0, currentDelay + (Math.random() - 0.5) * 0.5).toFixed(1);
+        }, 10000); // Update every 10 seconds
+    </script>
+</body>
+</html>
