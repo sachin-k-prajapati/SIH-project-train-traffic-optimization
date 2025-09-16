@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Scheduling Dashboard - Railway Control System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #1e3d59;
+            --secondary-blue: #2e5266;
+            --accent-green: #17c3b2;
+            --accent-orange: #ff6b35;
+            --accent-red: #dc3545;
+            --accent-yellow: #ffc107;
+            --status-ontime: #28a745;
+            --status-delayed: #dc3545;
+            --status-maintenance: #ffc107;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .scheduling-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .train-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--accent-green);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .train-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .train-card.delayed {
+            border-left-color: var(--accent-red);
+        }
+
+        .train-card.maintenance {
+            border-left-color: var(--accent-yellow);
+        }
+
+        .train-card.selected {
+            border-left-color: var(--accent-orange);
+            background: rgba(255, 107, 53, 0.05);
+        }
+
+        .train-status {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-ontime {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--status-ontime);
+        }
+
+        .status-delayed {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--status-delayed);
+        }
+
+        .status-maintenance {
+            background: rgba(255, 193, 7, 0.1);
+            color: var(--status-maintenance);
+        }
+
+        .timeline-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            padding: 1.5rem;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background: var(--primary-blue);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -37px;
+            top: 15px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            border: 3px solid white;
+        }
+
+        .timeline-item.conflict::before {
+            background: var(--accent-red);
+        }
+
+        .conflict-alert {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid var(--accent-red);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .optimization-panel {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .control-button {
+            background: var(--accent-green);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            margin: 0.25rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .control-button:hover {
+            background: #15a085;
+            transform: translateY(-2px);
+        }
+
+        .control-button.danger {
+            background: var(--accent-red);
+        }
+
+        .control-button.danger:hover {
+            background: #c82333;
+        }
+
+        .route-visualization {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border: 2px dashed #dee2e6;
+        }
+
+        .route-step {
+            display: inline-block;
+            background: var(--primary-blue);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin: 0.25rem;
+            font-size: 0.9rem;
+        }
+
+        .route-arrow {
+            color: var(--accent-orange);
+            font-size: 1.2rem;
+            margin: 0 0.5rem;
+        }
+
+        .performance-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .live-indicator {
+            background: var(--accent-green);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .filter-tabs {
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 1rem;
+        }
+
+        .filter-tab {
+            background: none;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            color: #6c757d;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .filter-tab.active {
+            color: var(--primary-blue);
+            border-bottom: 3px solid var(--primary-blue);
+        }
+
+        .train-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container-fluid">
+            <span class="navbar-brand text-white">
+                <i class="fas fa-calendar-alt"></i>
+                Train Scheduling Dashboard
+            </span>
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <a href="/enhanced/" class="text-white text-decoration-none me-3">
+                        <i class="fas fa-route"></i> Network Map
+                    </a>
+                    <a href="/scheduling/" class="text-white text-decoration-none me-3">
+                        <i class="fas fa-calendar-alt"></i> Train Scheduling
+                    </a>
+                    <a href="/" class="text-white text-decoration-none">
+                        <i class="fas fa-dashboard"></i> Classic Dashboard
+                    </a>
+                </div>
+                <span class="live-indicator">
+                    <i class="fas fa-circle"></i> LIVE
+                </span>
+                <span class="text-white ms-3" id="current-time"></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-3">
+        <!-- Optimization Control Panel -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="optimization-panel">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h4><i class="fas fa-cogs"></i> Route Optimization Control</h4>
+                            <p class="mb-0">Manage 15 active trains with AI-powered scheduling and conflict resolution</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="control-button" onclick="runOptimization()">
+                                <i class="fas fa-magic"></i> Optimize All Routes
+                            </button>
+                            <button class="control-button danger" onclick="emergencyStop()">
+                                <i class="fas fa-stop"></i> Emergency Stop
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="performance-metrics">
+                        <div class="metric-card">
+                            <div class="metric-value" id="total-trains">15</div>
+                            <div class="metric-label">Active Trains</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="conflicts">3</div>
+                            <div class="metric-label">Conflicts</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="avg-delay">4.2m</div>
+                            <div class="metric-label">Avg Delay</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="efficiency">87%</div>
+                            <div class="metric-label">Efficiency</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Train List Panel -->
+            <div class="col-lg-8">
+                <div class="scheduling-panel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5><i class="fas fa-train"></i> Train Schedule Management</h5>
+                        <div>
+                            <button class="control-button" onclick="addNewTrain()">
+                                <i class="fas fa-plus"></i> Add Train
+                            </button>
+                            <button class="control-button" onclick="refreshSchedule()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Tabs -->
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" onclick="filterTrains('all')">All Trains</button>
+                        <button class="filter-tab" onclick="filterTrains('delayed')">Delayed</button>
+                        <button class="filter-tab" onclick="filterTrains('ontime')">On Time</button>
+                        <button class="filter-tab" onclick="filterTrains('conflicts')">Conflicts</button>
+                    </div>
+
+                    <!-- Train Grid -->
+                    <div class="train-grid" id="train-grid">
+                        <!-- Train cards will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline and Details Panel -->
+            <div class="col-lg-4">
+                <div class="timeline-container">
+                    <h5><i class="fas fa-clock"></i> Schedule Timeline</h5>
+                    
+                    <!-- Conflict Alerts -->
+                    <div class="conflict-alert">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Conflict Alert</h6>
+                        <p><strong>Platform 2 - Thane:</strong> Train T005 and T007 scheduled to arrive simultaneously at 14:25</p>
+                        <button class="control-button" onclick="resolveConflict('conflict1')">
+                            <i class="fas fa-wrench"></i> Auto-Resolve
+                        </button>
+                    </div>
+
+                    <div class="timeline" id="schedule-timeline">
+                        <!-- Timeline items will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Train Detail Modal -->
+    <div class="modal fade" id="trainDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTrainTitle">Train Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalTrainBody">
+                    <!-- Train details will be populated by JavaScript -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="control-button" onclick="optimizeTrainRoute()">Optimize Route</button>
+                    <button type="button" class="control-button danger" onclick="holdTrain()">Hold Train</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Mock train data (12-18 trains as requested)
+        let trains = [
+            {
+                id: 'T001',
+                name: 'Mumbai Express',
+                route: ['Mumbai Central', 'Dadar', 'Kurla', 'Thane'],
+                currentStation: 'Dadar',
+                nextStation: 'Kurla',
+                status: 'ontime',
+                delay: 0,
+                eta: '14:25',
+                speed: 85,
+                passengers: 456,
+                platform: 2
+            },
+            {
+                id: 'T002',
+                name: 'Kalyan Local',
+                route: ['Thane', 'Mulund', 'Ghatkopar', 'Kurla'],
+                currentStation: 'Mulund',
+                nextStation: 'Ghatkopar',
+                status: 'delayed',
+                delay: 5,
+                eta: '14:32',
+                speed: 65,
+                passengers: 234,
+                platform: 1
+            },
+            {
+                id: 'T003',
+                name: 'Western Express',
+                route: ['Mumbai Central', 'Dadar', 'Ghatkopar'],
+                currentStation: 'Mumbai Central',
+                nextStation: 'Dadar',
+                status: 'ontime',
+                delay: 0,
+                eta: '14:15',
+                speed: 95,
+                passengers: 567,
+                platform: 3
+            },
+            {
+                id: 'T004',
+                name: 'Suburban Local',
+                route: ['Kurla', 'Thane', 'Mulund'],
+                currentStation: 'Kurla',
+                nextStation: 'Thane',
+                status: 'maintenance',
+                delay: 12,
+                eta: '14:45',
+                speed: 0,
+                passengers: 189,
+                platform: 1
+            },
+            {
+                id: 'T005',
+                name: 'City Express',
+                route: ['Ghatkopar', 'Kurla', 'Dadar', 'Mumbai Central'],
+                currentStation: 'Ghatkopar',
+                nextStation: 'Kurla',
+                status: 'ontime',
+                delay: 0,
+                eta: '14:28',
+                speed: 78,
+                passengers: 432,
+                platform: 2
+            }
+        ];
+
+        // Add more trains to reach 15 total
+        for (let i = 6; i <= 15; i++) {
+            trains.push({
+                id: `T${String(i).padStart(3, '0')}`,
+                name: `Train ${String(i).padStart(3, '0')}`,
+                route: generateRandomRoute(),
+                currentStation: getRandomStation(),
+                nextStation: getRandomStation(),
+                status: Math.random() > 0.7 ? 'delayed' : 'ontime',
+                delay: Math.random() > 0.7 ? Math.floor(Math.random() * 15) : 0,
+                eta: generateRandomTime(),
+                speed: Math.floor(Math.random() * 60) + 40,
+                passengers: Math.floor(Math.random() * 400) + 100,
+                platform: Math.floor(Math.random() * 3) + 1
+            });
+        }
+
+        function generateRandomRoute() {
+            const stations = ['Mumbai Central', 'Dadar', 'Kurla', 'Thane', 'Ghatkopar', 'Mulund'];
+            const routeLength = Math.floor(Math.random() * 3) + 2;
+            const route = [];
+            let currentIndex = Math.floor(Math.random() * stations.length);
+            
+            for (let i = 0; i < routeLength; i++) {
+                route.push(stations[currentIndex]);
+                currentIndex = (currentIndex + 1) % stations.length;
+            }
+            
+            return route;
+        }
+
+        function getRandomStation() {
+            const stations = ['Mumbai Central', 'Dadar', 'Kurla', 'Thane', 'Ghatkopar', 'Mulund'];
+            return stations[Math.floor(Math.random() * stations.length)];
+        }
+
+        function generateRandomTime() {
+            const hour = Math.floor(Math.random() * 4) + 14; // 14-17 hours
+            const minute = Math.floor(Math.random() * 60);
+            return `${hour}:${String(minute).padStart(2, '0')}`;
+        }
+
+        // Real-time clock
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Populate train grid
+        function populateTrainGrid(trainList = trains) {
+            const grid = document.getElementById('train-grid');
+            grid.innerHTML = '';
+            
+            trainList.forEach(train => {
+                const trainCard = document.createElement('div');
+                trainCard.className = `train-card ${train.status}`;
+                trainCard.onclick = () => showTrainDetails(train);
+                
+                trainCard.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="mb-1"><strong>${train.id}</strong> - ${train.name}</h6>
+                            <small class="text-muted">${train.currentStation} → ${train.nextStation}</small>
+                        </div>
+                        <span class="train-status status-${train.status}">
+                            ${train.status === 'ontime' ? 'On Time' : 
+                              train.status === 'delayed' ? `+${train.delay}m` : 
+                              'Maintenance'}
+                        </span>
+                    </div>
+                    
+                    <div class="route-visualization">
+                        ${train.route.map((station, index) => 
+                            `<span class="route-step ${station === train.currentStation ? 'bg-warning text-dark' : ''}">${station}</span>
+                             ${index < train.route.length - 1 ? '<i class="fas fa-arrow-right route-arrow"></i>' : ''}`
+                        ).join('')}
+                    </div>
+                    
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <small><strong>ETA:</strong> ${train.eta}</small><br>
+                            <small><strong>Speed:</strong> ${train.speed} km/h</small>
+                        </div>
+                        <div class="col-6">
+                            <small><strong>Platform:</strong> ${train.platform}</small><br>
+                            <small><strong>Passengers:</strong> ${train.passengers}</small>
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(trainCard);
+            });
+        }
+
+        // Populate timeline
+        function populateTimeline() {
+            const timeline = document.getElementById('schedule-timeline');
+            const sortedTrains = [...trains].sort((a, b) => a.eta.localeCompare(b.eta));
+            
+            timeline.innerHTML = '';
+            
+            sortedTrains.slice(0, 8).forEach(train => {
+                const timelineItem = document.createElement('div');
+                timelineItem.className = `timeline-item ${train.status === 'delayed' ? 'conflict' : ''}`;
+                
+                timelineItem.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">${train.id} - ${train.name}</h6>
+                            <small class="text-muted">${train.nextStation} arrival</small>
+                        </div>
+                        <div class="text-end">
+                            <strong>${train.eta}</strong><br>
+                            <small class="text-${train.status === 'delayed' ? 'danger' : 'success'}">
+                                ${train.status === 'delayed' ? `+${train.delay}m` : 'On Time'}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small><strong>Platform:</strong> ${train.platform} | <strong>Passengers:</strong> ${train.passengers}</small>
+                    </div>
+                `;
+                
+                timeline.appendChild(timelineItem);
+            });
+        }
+
+        // Filter trains
+        function filterTrains(filter) {
+            // Update tab appearance
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            let filteredTrains;
+            switch(filter) {
+                case 'delayed':
+                    filteredTrains = trains.filter(t => t.status === 'delayed');
+                    break;
+                case 'ontime':
+                    filteredTrains = trains.filter(t => t.status === 'ontime');
+                    break;
+                case 'conflicts':
+                    filteredTrains = trains.filter(t => t.delay > 5);
+                    break;
+                default:
+                    filteredTrains = trains;
+            }
+            
+            populateTrainGrid(filteredTrains);
+        }
+
+        // Show train details in modal
+        function showTrainDetails(train) {
+            document.getElementById('modalTrainTitle').textContent = `${train.id} - ${train.name}`;
+            document.getElementById('modalTrainBody').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Current Status</h6>
+                        <p><strong>Location:</strong> ${train.currentStation}</p>
+                        <p><strong>Next Stop:</strong> ${train.nextStation}</p>
+                        <p><strong>Speed:</strong> ${train.speed} km/h</p>
+                        <p><strong>Delay:</strong> ${train.delay === 0 ? 'On Time' : `${train.delay} minutes`}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Details</h6>
+                        <p><strong>ETA:</strong> ${train.eta}</p>
+                        <p><strong>Platform:</strong> ${train.platform}</p>
+                        <p><strong>Passengers:</strong> ${train.passengers}</p>
+                        <p><strong>Status:</strong> ${train.status}</p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h6>Route</h6>
+                    <div class="route-visualization">
+                        ${train.route.map((station, index) => 
+                            `<span class="route-step ${station === train.currentStation ? 'bg-warning text-dark' : ''}">${station}</span>
+                             ${index < train.route.length - 1 ? '<i class="fas fa-arrow-right route-arrow"></i>' : ''}`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+            
+            new bootstrap.Modal(document.getElementById('trainDetailModal')).show();
+        }
+
+        // Control functions
+        function runOptimization() {
+            alert('Running AI optimization for all 15 trains...\n\nOptimization complete!\n- Reduced conflicts by 60%\n- Average delay reduced by 2.3 minutes\n- Efficiency improved by 12%');
+            
+            // Simulate improvement
+            trains.forEach(train => {
+                if (train.status === 'delayed' && Math.random() > 0.5) {
+                    train.delay = Math.max(0, train.delay - Math.floor(Math.random() * 5));
+                    if (train.delay === 0) train.status = 'ontime';
+                }
+            });
+            
+            populateTrainGrid();
+            populateTimeline();
+            updateMetrics();
+        }
+
+        function emergencyStop() {
+            if (confirm('Are you sure you want to initiate emergency stop for all trains?')) {
+                alert('Emergency stop initiated. All trains will be safely halted at the next station.');
+                trains.forEach(train => {
+                    train.speed = 0;
+                    train.status = 'maintenance';
+                });
+                populateTrainGrid();
+            }
+        }
+
+        function addNewTrain() {
+            const newId = `T${String(trains.length + 1).padStart(3, '0')}`;
+            const newTrain = {
+                id: newId,
+                name: `New Train ${newId}`,
+                route: generateRandomRoute(),
+                currentStation: getRandomStation(),
+                nextStation: getRandomStation(),
+                status: 'ontime',
+                delay: 0,
+                eta: generateRandomTime(),
+                speed: Math.floor(Math.random() * 60) + 40,
+                passengers: Math.floor(Math.random() * 400) + 100,
+                platform: Math.floor(Math.random() * 3) + 1
+            };
+            
+            trains.push(newTrain);
+            populateTrainGrid();
+            updateMetrics();
+            alert(`${newId} has been added to the schedule.`);
+        }
+
+        function refreshSchedule() {
+            // Simulate real-time updates
+            trains.forEach(train => {
+                if (Math.random() > 0.8) {
+                    train.delay += Math.floor(Math.random() * 3);
+                    if (train.delay > 0) train.status = 'delayed';
+                }
+            });
+            
+            populateTrainGrid();
+            populateTimeline();
+            updateMetrics();
+        }
+
+        function updateMetrics() {
+            document.getElementById('total-trains').textContent = trains.length;
+            document.getElementById('conflicts').textContent = trains.filter(t => t.delay > 5).length;
+            document.getElementById('avg-delay').textContent = 
+                (trains.reduce((sum, t) => sum + t.delay, 0) / trains.length).toFixed(1) + 'm';
+            document.getElementById('efficiency').textContent = 
+                Math.floor(trains.filter(t => t.status === 'ontime').length / trains.length * 100) + '%';
+        }
+
+        function resolveConflict(conflictId) {
+            alert('Conflict resolved automatically!\n\nTrain T007 has been rerouted to Platform 3.\nDelay reduced from 5 minutes to 2 minutes.');
+        }
+
+        function optimizeTrainRoute() {
+            alert('Route optimization completed for selected train!\n\nNew route reduces travel time by 8 minutes.');
+        }
+
+        function holdTrain() {
+            alert('Train has been held at current station for safety reasons.');
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            populateTrainGrid();
+            populateTimeline();
+            updateMetrics();
+            
+            // Auto-refresh every 10 seconds
+            setInterval(() => {
+                refreshSchedule();
+            }, 10000);
+        });
+    </script>
+</body>
+</html>

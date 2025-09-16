@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Railway Control System - Live Network</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #1e3d59;
+            --secondary-blue: #2e5266;
+            --accent-green: #17c3b2;
+            --accent-orange: #ff6b35;
+            --accent-red: #dc3545;
+            --accent-yellow: #ffc107;
+            --track-free: #28a745;
+            --track-occupied: #dc3545;
+            --track-maintenance: #ffc107;
+            --station-active: #007bff;
+            --station-selected: #ff6b35;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: auto;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white !important;
+        }
+
+        .control-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .network-map-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            padding: 2rem;
+            margin-bottom: 1rem;
+            min-height: 500px;
+            position: relative;
+            overflow: auto;
+        }
+
+        .station-info-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .network-map {
+            width: 100%;
+            height: 450px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            background: linear-gradient(45deg, #f8f9fa 25%, transparent 25%), 
+                        linear-gradient(-45deg, #f8f9fa 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #f8f9fa 75%), 
+                        linear-gradient(-45deg, transparent 75%, #f8f9fa 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .station {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .station circle {
+            fill: var(--station-active);
+            stroke: white;
+            stroke-width: 3;
+            transition: all 0.3s ease;
+        }
+
+        .station:hover circle {
+            fill: var(--station-selected);
+            stroke-width: 4;
+            r: 18;
+        }
+
+        .station.selected circle {
+            fill: var(--station-selected);
+            stroke-width: 4;
+            animation: pulse 2s infinite;
+        }
+
+        .station text {
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            fill: #333;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        .track {
+            stroke: #6c757d;
+            stroke-width: 4;
+            fill: none;
+            transition: all 0.3s ease;
+        }
+
+        .track.free {
+            stroke: var(--track-free);
+        }
+
+        .track.occupied {
+            stroke: var(--track-occupied);
+            animation: track-pulse 1.5s infinite;
+        }
+
+        .track.maintenance {
+            stroke: var(--track-maintenance);
+            stroke-dasharray: 10,5;
+        }
+
+        .train {
+            cursor: pointer;
+            transition: all 0.5s ease;
+        }
+
+        .train circle {
+            fill: var(--accent-orange);
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        .train text {
+            font-size: 10px;
+            font-weight: bold;
+            fill: white;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        .train.moving {
+            animation: train-move 3s linear infinite;
+        }
+
+        .direction-arrow {
+            fill: #495057;
+            animation: arrow-flow 2s linear infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes track-pulse {
+            0%, 100% { stroke-width: 4; }
+            50% { stroke-width: 6; }
+        }
+
+        @keyframes train-move {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(10px); }
+        }
+
+        @keyframes arrow-flow {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
+
+        .kpi-card {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .kpi-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .platform-status {
+            padding: 0.5rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .platform-free {
+            background: rgba(40, 167, 69, 0.1);
+            border-left: 4px solid var(--track-free);
+        }
+
+        .platform-occupied {
+            background: rgba(220, 53, 69, 0.1);
+            border-left: 4px solid var(--track-occupied);
+        }
+
+        .platform-maintenance {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid var(--track-maintenance);
+        }
+
+        .train-schedule-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-left: 4px solid var(--accent-green);
+        }
+
+        .train-schedule-item.delayed {
+            border-left-color: var(--accent-red);
+        }
+
+        .train-schedule-item.ontime {
+            border-left-color: var(--accent-green);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-free { background-color: var(--track-free); }
+        .status-occupied { background-color: var(--track-occupied); }
+        .status-maintenance { background-color: var(--track-maintenance); }
+
+        .live-indicator {
+            background: var(--accent-green);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+
+        .control-button {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            margin: 0.25rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:hover {
+            background: var(--secondary-blue);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container-fluid">
+            <span class="navbar-brand">
+                <i class="fas fa-train"></i>
+                Advanced Railway Control System
+            </span>
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <a href="/enhanced/" class="text-white text-decoration-none me-3">
+                        <i class="fas fa-route"></i> Network Map
+                    </a>
+                    <a href="/scheduling/" class="text-white text-decoration-none me-3">
+                        <i class="fas fa-calendar-alt"></i> Train Scheduling
+                    </a>
+                    <a href="/" class="text-white text-decoration-none">
+                        <i class="fas fa-dashboard"></i> Classic Dashboard
+                    </a>
+                </div>
+                <span class="live-indicator">
+                    <i class="fas fa-circle"></i> LIVE
+                </span>
+                <span class="text-white ms-3" id="current-time"></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-3">
+        <div class="row">
+            <!-- Control Panel -->
+            <div class="col-12 mb-3">
+                <div class="control-panel">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="kpi-card">
+                                <div class="kpi-value" id="active-trains">{{ active_trains|length }}</div>
+                                <div class="kpi-label">Active Trains</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card">
+                                <div class="kpi-value" id="avg-delay">{{ kpis.avg_delay_minutes }}m</div>
+                                <div class="kpi-label">Avg Delay</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card">
+                                <div class="kpi-value" id="throughput">{{ kpis.throughput_trains }}</div>
+                                <div class="kpi-label">Trains/Hour</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card">
+                                <div class="kpi-value" id="punctuality">{{ kpis.punctuality_percent }}%</div>
+                                <div class="kpi-label">On-Time</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Interactive Network Map -->
+            <div class="col-lg-8">
+                <div class="network-map-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="fas fa-route"></i> Live Railway Network</h4>
+                        <div>
+                            <button class="control-button" onclick="refreshMap()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <button class="control-button" onclick="toggleAutoRefresh()">
+                                <i class="fas fa-play"></i> Auto-Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <svg class="network-map" id="network-map">
+                        <!-- Tracks -->
+                        <line class="track free" x1="100" y1="200" x2="300" y2="200" data-track="A-B"/>
+                        <line class="track occupied" x1="300" y1="200" x2="500" y2="150" data-track="B-C"/>
+                        <line class="track free" x1="500" y1="150" x2="700" y2="150" data-track="C-D"/>
+                        <line class="track maintenance" x1="300" y1="200" x2="500" y2="250" data-track="B-E"/>
+                        <line class="track free" x1="500" y1="250" x2="700" y2="250" data-track="E-F"/>
+                        <line class="track occupied" x1="700" y1="150" x2="700" y2="250" data-track="D-F"/>
+                        
+                        <!-- Direction Arrows -->
+                        <polygon class="direction-arrow" points="200,195 210,200 200,205" data-direction="A-B"/>
+                        <polygon class="direction-arrow" points="395,175 405,180 395,185" data-direction="B-C"/>
+                        <polygon class="direction-arrow" points="595,145 605,150 595,155" data-direction="C-D"/>
+                        
+                        <!-- Stations -->
+                        <g class="station" data-station="A" onclick="selectStation('A')">
+                            <circle cx="100" cy="200" r="15"/>
+                            <text x="100" y="230">Station A</text>
+                            <text x="100" y="245" style="font-size: 10px; fill: #666;">Mumbai Central</text>
+                        </g>
+                        
+                        <g class="station" data-station="B" onclick="selectStation('B')">
+                            <circle cx="300" cy="200" r="15"/>
+                            <text x="300" y="230">Station B</text>
+                            <text x="300" y="245" style="font-size: 10px; fill: #666;">Dadar Junction</text>
+                        </g>
+                        
+                        <g class="station" data-station="C" onclick="selectStation('C')">
+                            <circle cx="500" cy="150" r="15"/>
+                            <text x="500" y="180">Station C</text>
+                            <text x="500" y="195" style="font-size: 10px; fill: #666;">Kurla</text>
+                        </g>
+                        
+                        <g class="station selected" data-station="D" onclick="selectStation('D')">
+                            <circle cx="700" cy="150" r="15"/>
+                            <text x="700" y="180">Station D</text>
+                            <text x="700" y="195" style="font-size: 10px; fill: #666;">Thane</text>
+                        </g>
+                        
+                        <g class="station" data-station="E" onclick="selectStation('E')">
+                            <circle cx="500" cy="250" r="15"/>
+                            <text x="500" y="280">Station E</text>
+                            <text x="500" y="295" style="font-size: 10px; fill: #666;">Ghatkopar</text>
+                        </g>
+                        
+                        <g class="station" data-station="F" onclick="selectStation('F')">
+                            <circle cx="700" cy="250" r="15"/>
+                            <text x="700" y="280">Station F</text>
+                            <text x="700" y="295" style="font-size: 10px; fill: #666;">Mulund</text>
+                        </g>
+                        
+                        <!-- Trains -->
+                        <g class="train moving" data-train="T001" onclick="selectTrain('T001')">
+                            <circle cx="200" cy="200" r="8"/>
+                            <text x="200" y="205">T1</text>
+                        </g>
+                        
+                        <g class="train" data-train="T002" onclick="selectTrain('T002')">
+                            <circle cx="400" cy="175" r="8"/>
+                            <text x="400" y="180">T2</text>
+                        </g>
+                        
+                        <g class="train moving" data-train="T003" onclick="selectTrain('T003')">
+                            <circle cx="600" cy="250" r="8"/>
+                            <text x="600" y="255">T3</text>
+                        </g>
+                    </svg>
+                    
+                    <div class="mt-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <small><span class="status-indicator status-free"></span> Track Free</small>
+                            </div>
+                            <div class="col-md-4">
+                                <small><span class="status-indicator status-occupied"></span> Track Occupied</small>
+                            </div>
+                            <div class="col-md-4">
+                                <small><span class="status-indicator status-maintenance"></span> Maintenance</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Station Information Panel -->
+            <div class="col-lg-4">
+                <div class="station-info-panel">
+                    <h5><i class="fas fa-info-circle"></i> Station Information</h5>
+                    <div id="station-details">
+                        <div class="alert alert-info">
+                            <strong>Station D - Thane</strong>
+                            <br><small>Selected Station</small>
+                        </div>
+                        
+                        <h6 class="mt-3">Platform Status</h6>
+                        <div class="platform-status platform-occupied">
+                            <span><strong>Platform 1</strong></span>
+                            <span><i class="fas fa-train"></i> Train T002</span>
+                        </div>
+                        <div class="platform-status platform-free">
+                            <span><strong>Platform 2</strong></span>
+                            <span><i class="fas fa-check-circle"></i> Available</span>
+                        </div>
+                        <div class="platform-status platform-maintenance">
+                            <span><strong>Platform 3</strong></span>
+                            <span><i class="fas fa-wrench"></i> Maintenance</span>
+                        </div>
+                        
+                        <h6 class="mt-3">Track Directions</h6>
+                        <div class="mb-2">
+                            <i class="fas fa-arrow-up text-success"></i> <strong>Northbound:</strong> To Mumbai Central
+                        </div>
+                        <div class="mb-2">
+                            <i class="fas fa-arrow-down text-primary"></i> <strong>Southbound:</strong> To Kalyan
+                        </div>
+                        
+                        <h6 class="mt-3">Incoming Trains</h6>
+                        <div class="train-schedule-item ontime">
+                            <div class="d-flex justify-content-between">
+                                <strong>Train T005</strong>
+                                <span class="text-success">On Time</span>
+                            </div>
+                            <small>ETA: 14:25 | From: Kurla</small>
+                        </div>
+                        <div class="train-schedule-item delayed">
+                            <div class="d-flex justify-content-between">
+                                <strong>Train T007</strong>
+                                <span class="text-danger">+5 min</span>
+                            </div>
+                            <small>ETA: 14:32 | From: Mumbai Central</small>
+                        </div>
+                        <div class="train-schedule-item ontime">
+                            <div class="d-flex justify-content-between">
+                                <strong>Train T009</strong>
+                                <span class="text-success">On Time</span>
+                            </div>
+                            <small>ETA: 14:40 | From: Ghatkopar</small>
+                        </div>
+                        
+                        <h6 class="mt-3">Quick Actions</h6>
+                        <button class="control-button w-100 mb-2">
+                            <i class="fas fa-route"></i> Optimize Routes
+                        </button>
+                        <button class="control-button w-100 mb-2">
+                            <i class="fas fa-exclamation-triangle"></i> Report Issue
+                        </button>
+                        <button class="control-button w-100">
+                            <i class="fas fa-chart-line"></i> View Analytics
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Real-time clock
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Station selection
+        let selectedStation = 'D';
+        
+        function selectStation(stationId) {
+            // Remove previous selection
+            document.querySelectorAll('.station').forEach(station => {
+                station.classList.remove('selected');
+            });
+            
+            // Add selection to clicked station
+            document.querySelector(`[data-station="${stationId}"]`).classList.add('selected');
+            selectedStation = stationId;
+            
+            // Update station details (mock data for now)
+            updateStationDetails(stationId);
+        }
+        
+        function updateStationDetails(stationId) {
+            const stationNames = {
+                'A': 'Mumbai Central',
+                'B': 'Dadar Junction', 
+                'C': 'Kurla',
+                'D': 'Thane',
+                'E': 'Ghatkopar',
+                'F': 'Mulund'
+            };
+            
+            const stationDetail = document.getElementById('station-details');
+            stationDetail.innerHTML = `
+                <div class="alert alert-info">
+                    <strong>Station ${stationId} - ${stationNames[stationId]}</strong>
+                    <br><small>Selected Station</small>
+                </div>
+                
+                <h6 class="mt-3">Platform Status</h6>
+                <div class="platform-status platform-occupied">
+                    <span><strong>Platform 1</strong></span>
+                    <span><i class="fas fa-train"></i> Train T00${Math.floor(Math.random()*9)+1}</span>
+                </div>
+                <div class="platform-status platform-free">
+                    <span><strong>Platform 2</strong></span>
+                    <span><i class="fas fa-check-circle"></i> Available</span>
+                </div>
+                <div class="platform-status ${Math.random() > 0.5 ? 'platform-maintenance' : 'platform-free'}">
+                    <span><strong>Platform 3</strong></span>
+                    <span><i class="fas fa-${Math.random() > 0.5 ? 'wrench' : 'check-circle'}"></i> ${Math.random() > 0.5 ? 'Maintenance' : 'Available'}</span>
+                </div>
+                
+                <h6 class="mt-3">Track Directions</h6>
+                <div class="mb-2">
+                    <i class="fas fa-arrow-up text-success"></i> <strong>Northbound:</strong> To Previous Station
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-arrow-down text-primary"></i> <strong>Southbound:</strong> To Next Station
+                </div>
+                
+                <h6 class="mt-3">Incoming Trains</h6>
+                <div class="train-schedule-item ontime">
+                    <div class="d-flex justify-content-between">
+                        <strong>Train T${String(Math.floor(Math.random()*900)+100).padStart(3, '0')}</strong>
+                        <span class="text-success">On Time</span>
+                    </div>
+                    <small>ETA: ${new Date(Date.now() + Math.random()*1800000).toLocaleTimeString().substr(0,5)}</small>
+                </div>
+                <div class="train-schedule-item ${Math.random() > 0.6 ? 'delayed' : 'ontime'}">
+                    <div class="d-flex justify-content-between">
+                        <strong>Train T${String(Math.floor(Math.random()*900)+100).padStart(3, '0')}</strong>
+                        <span class="text-${Math.random() > 0.6 ? 'danger' : 'success'}">${Math.random() > 0.6 ? '+' + Math.floor(Math.random()*15+1) + ' min' : 'On Time'}</span>
+                    </div>
+                    <small>ETA: ${new Date(Date.now() + Math.random()*3600000).toLocaleTimeString().substr(0,5)}</small>
+                </div>
+                
+                <h6 class="mt-3">Quick Actions</h6>
+                <button class="control-button w-100 mb-2" onclick="optimizeRoutes()">
+                    <i class="fas fa-route"></i> Optimize Routes
+                </button>
+                <button class="control-button w-100 mb-2" onclick="reportIssue()">
+                    <i class="fas fa-exclamation-triangle"></i> Report Issue
+                </button>
+                <button class="control-button w-100" onclick="viewAnalytics()">
+                    <i class="fas fa-chart-line"></i> View Analytics
+                </button>
+            `;
+        }
+        
+        function selectTrain(trainId) {
+            alert(`Train ${trainId} selected. Showing detailed information...`);
+        }
+        
+        function refreshMap() {
+            // Animate refresh
+            const button = event.target;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            
+            setTimeout(() => {
+                button.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
+                // Update train positions randomly
+                updateTrainPositions();
+            }, 1000);
+        }
+        
+        function updateTrainPositions() {
+            const trains = document.querySelectorAll('.train');
+            trains.forEach(train => {
+                const circle = train.querySelector('circle');
+                const text = train.querySelector('text');
+                const newX = Math.random() * 600 + 100;
+                const newY = Math.random() * 100 + 150;
+                
+                circle.setAttribute('cx', newX);
+                circle.setAttribute('cy', newY);
+                text.setAttribute('x', newX);
+                text.setAttribute('y', newY + 5);
+            });
+        }
+        
+        let autoRefreshEnabled = false;
+        let autoRefreshInterval;
+        
+        function toggleAutoRefresh() {
+            const button = event.target;
+            if (autoRefreshEnabled) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshEnabled = false;
+                button.innerHTML = '<i class="fas fa-play"></i> Auto-Refresh';
+                button.style.background = 'var(--primary-blue)';
+            } else {
+                autoRefreshInterval = setInterval(() => {
+                    updateTrainPositions();
+                    updateKPIs();
+                }, 5000);
+                autoRefreshEnabled = true;
+                button.innerHTML = '<i class="fas fa-pause"></i> Auto-Refresh';
+                button.style.background = 'var(--accent-green)';
+            }
+        }
+        
+        function updateKPIs() {
+            // Simulate live KPI updates
+            document.getElementById('active-trains').textContent = Math.floor(Math.random() * 8) + 12;
+            document.getElementById('avg-delay').textContent = Math.floor(Math.random() * 10) + 'm';
+            document.getElementById('throughput').textContent = Math.floor(Math.random() * 15) + 25;
+            document.getElementById('punctuality').textContent = Math.floor(Math.random() * 20) + 75 + '%';
+        }
+        
+        function optimizeRoutes() {
+            alert('Route optimization initiated for Station ' + selectedStation);
+        }
+        
+        function reportIssue() {
+            alert('Issue reporting system opened for Station ' + selectedStation);
+        }
+        
+        function viewAnalytics() {
+            alert('Analytics dashboard opened for Station ' + selectedStation);
+        }
+        
+        // Initialize auto-refresh on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Start auto-refresh after 2 seconds
+            setTimeout(() => {
+                toggleAutoRefresh();
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

@@ -7,6 +7,7 @@ from core.models import Section, Train, Segment, WeatherCondition, EmergencyEven
 from simulator.engine import RealTimeRailwaySimulator
 from decision.engines.ilp_engine import AdvancedILPEngine
 import logging
+import random
 
 # Simulated WebSocket consumer for development
 # In production, would use Django Channels
@@ -31,7 +32,253 @@ def database_sync_to_async(func):
 
 logger = logging.getLogger(__name__)
 
-class DashboardConsumer(AsyncWebsocketConsumer):
+class EnhancedDashboardConsumer(AsyncWebsocketConsumer):
+    """
+    Enhanced WebSocket consumer for real-time railway control dashboard
+    Provides live train tracking, network visualization, and real-time updates
+    """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.section_id = None
+        self.simulator = None
+        self.optimizer = None
+        self.update_task = None
+        self.train_positions = {}
+        self.station_status = {}
+        
+    async def connect(self):
+        """Accept WebSocket connection and start real-time updates"""
+        self.section_id = self.scope['url_route']['kwargs'].get('section_id', 1)
+        
+        # Initialize train positions and station status
+        await self.initialize_network_state()
+        
+        await self.accept()
+        logger.info(f"WebSocket connected for section {self.section_id}")
+        
+        # Start real-time update task
+        self.update_task = asyncio.create_task(self.send_periodic_updates())
+        
+    async def disconnect(self, close_code):
+        """Clean up when WebSocket disconnects"""
+        if self.update_task:
+            self.update_task.cancel()
+        logger.info(f"WebSocket disconnected for section {self.section_id}")
+    
+    async def receive(self, text_data):
+        """Handle incoming WebSocket messages"""
+        try:
+            data = json.loads(text_data)
+            message_type = data.get('type')
+            
+            if message_type == 'get_train_positions':
+                await self.send_train_positions()
+            elif message_type == 'get_station_status':
+                station_id = data.get('station_id')
+                await self.send_station_status(station_id)
+            elif message_type == 'optimize_routes':
+                await self.handle_route_optimization()
+            elif message_type == 'update_train':
+                await self.handle_train_update(data)
+                
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON received from WebSocket")
+    
+    async def initialize_network_state(self):
+        """Initialize the network state with stations and trains"""
+        # Station network (matches your design)
+        self.stations = {
+            'A': {'name': 'Mumbai Central', 'x': 100, 'y': 200, 'platforms': 3},
+            'B': {'name': 'Dadar Junction', 'x': 300, 'y': 200, 'platforms': 4},
+            'C': {'name': 'Kurla', 'x': 500, 'y': 150, 'platforms': 2},
+            'D': {'name': 'Thane', 'x': 700, 'y': 150, 'platforms': 3},
+            'E': {'name': 'Ghatkopar', 'x': 500, 'y': 250, 'platforms': 2},
+            'F': {'name': 'Mulund', 'x': 700, 'y': 250, 'platforms': 2},
+        }
+        
+        # Initialize train positions (12-18 trains as requested)
+        self.train_positions = {
+            f'T{str(i).zfill(3)}': {
+                'id': f'T{str(i).zfill(3)}',
+                'name': f'Train {str(i).zfill(3)}',
+                'x': random.randint(100, 700),
+                'y': random.randint(150, 250),
+                'status': random.choice(['moving', 'stopped', 'boarding']),
+                'route': self.generate_random_route(),
+                'speed': random.randint(40, 120),
+                'delay': random.randint(0, 15),
+                'destination': random.choice(list(self.stations.keys()))
+            }
+            for i in range(1, 16)  # 15 trains
+        }
+        
+        # Initialize station status
+        for station_id, station_data in self.stations.items():
+            self.station_status[station_id] = {
+                'platforms': [
+                    {
+                        'number': i + 1,
+                        'status': random.choice(['free', 'occupied', 'maintenance']),
+                        'train_id': f'T{str(random.randint(1, 15)).zfill(3)}' if random.random() > 0.6 else None,
+                        'direction': random.choice(['northbound', 'southbound', 'eastbound', 'westbound'])
+                    }
+                    for i in range(station_data['platforms'])
+                ],
+                'incoming_trains': self.generate_incoming_trains(station_id)
+            }
+    
+    def generate_random_route(self):
+        """Generate a random route between stations"""
+        stations = list(self.stations.keys())
+        start = random.choice(stations)
+        end = random.choice([s for s in stations if s != start])
+        return f"{start}-{end}"
+    
+    def generate_incoming_trains(self, station_id):
+        """Generate incoming train schedule for a station"""
+        trains = []
+        for i in range(random.randint(2, 5)):
+            eta_minutes = random.randint(5, 60)
+            trains.append({
+                'train_id': f'T{str(random.randint(1, 15)).zfill(3)}',
+                'eta': (datetime.now() + timedelta(minutes=eta_minutes)).strftime('%H:%M'),
+                'from_station': random.choice([k for k in self.stations.keys() if k != station_id]),
+                'status': random.choice(['ontime', 'delayed']) if random.random() > 0.3 else 'ontime',
+                'delay': random.randint(1, 10) if random.random() > 0.7 else 0
+            })
+        return sorted(trains, key=lambda x: x['eta'])
+    
+    async def send_periodic_updates(self):
+        """Send periodic updates every 5 seconds"""
+        while True:
+            try:
+                await asyncio.sleep(5)  # Update every 5 seconds
+                
+                # Update train positions
+                await self.update_train_positions()
+                
+                # Send all updates
+                await self.send_network_update()
+                await self.send_kpi_update()
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in periodic updates: {e}")
+    
+    async def update_train_positions(self):
+        """Update train positions for animation"""
+        for train_id, train_data in self.train_positions.items():
+            if train_data['status'] == 'moving':
+                # Simple movement simulation
+                train_data['x'] += random.randint(-20, 20)
+                train_data['y'] += random.randint(-10, 10)
+                
+                # Keep trains within bounds
+                train_data['x'] = max(100, min(700, train_data['x']))
+                train_data['y'] = max(150, min(250, train_data['y']))
+                
+                # Occasionally change status
+                if random.random() > 0.95:
+                    train_data['status'] = random.choice(['moving', 'stopped', 'boarding'])
+    
+    async def send_network_update(self):
+        """Send network state update"""
+        update_data = {
+            'type': 'network_update',
+            'timestamp': datetime.now().isoformat(),
+            'trains': list(self.train_positions.values()),
+            'station_status': self.station_status
+        }
+        
+        await self.send(text_data=json.dumps(update_data))
+    
+    async def send_kpi_update(self):
+        """Send KPI updates"""
+        kpi_data = {
+            'type': 'kpi_update',
+            'timestamp': datetime.now().isoformat(),
+            'kpis': {
+                'active_trains': len([t for t in self.train_positions.values() if t['status'] != 'stopped']),
+                'avg_delay': sum(t['delay'] for t in self.train_positions.values()) / len(self.train_positions),
+                'throughput': random.randint(25, 40),
+                'punctuality': random.randint(75, 95),
+                'alerts': random.randint(0, 3)
+            }
+        }
+        
+        await self.send(text_data=json.dumps(kpi_data))
+    
+    async def send_train_positions(self):
+        """Send current train positions"""
+        position_data = {
+            'type': 'train_positions',
+            'timestamp': datetime.now().isoformat(),
+            'trains': list(self.train_positions.values())
+        }
+        
+        await self.send(text_data=json.dumps(position_data))
+    
+    async def send_station_status(self, station_id):
+        """Send detailed station status"""
+        if station_id in self.station_status:
+            status_data = {
+                'type': 'station_status',
+                'timestamp': datetime.now().isoformat(),
+                'station_id': station_id,
+                'station_name': self.stations[station_id]['name'],
+                'status': self.station_status[station_id]
+            }
+            
+            await self.send(text_data=json.dumps(status_data))
+    
+    async def handle_route_optimization(self):
+        """Handle route optimization request"""
+        # Simulate optimization calculation
+        await asyncio.sleep(1)  # Simulate processing time
+        
+        optimization_result = {
+            'type': 'optimization_result',
+            'timestamp': datetime.now().isoformat(),
+            'status': 'success',
+            'improved_routes': [
+                {
+                    'train_id': 'T001',
+                    'original_route': 'A-B-C',
+                    'optimized_route': 'A-E-F',
+                    'time_saved': 12
+                },
+                {
+                    'train_id': 'T005',
+                    'original_route': 'B-C-D',
+                    'optimized_route': 'B-D',
+                    'time_saved': 8
+                }
+            ],
+            'total_delay_reduction': 20,
+            'efficiency_improvement': 15.5
+        }
+        
+        await self.send(text_data=json.dumps(optimization_result))
+    
+    async def handle_train_update(self, data):
+        """Handle manual train updates"""
+        train_id = data.get('train_id')
+        if train_id in self.train_positions:
+            updates = data.get('updates', {})
+            self.train_positions[train_id].update(updates)
+            
+            # Send confirmation
+            response = {
+                'type': 'train_update_response',
+                'timestamp': datetime.now().isoformat(),
+                'train_id': train_id,
+                'status': 'updated',
+                'new_data': self.train_positions[train_id]
+            }
+            
+            await self.send(text_data=json.dumps(response))
     """
     WebSocket consumer for real-time dashboard updates
     Provides live train tracking, KPI updates, and optimization results
