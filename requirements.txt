@@ -3,4 +3,11 @@ djangorestframework
 ortools
 simpy
 numpy
+pandas
+scikit-learn
+joblib
 stable-baselines3
+matplotlib
+seaborn
+plotly
+psutil
